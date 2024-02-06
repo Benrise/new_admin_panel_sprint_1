@@ -12,14 +12,24 @@ class PersonFilmworkInline(admin.TabularInline):
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    pass
+    search_fields = ('name', 'description', 'id')
 
 
 @admin.register(Filmwork)
 class FilmworkAdmin(admin.ModelAdmin):
     inlines = (GenreFilmworkInline,)
 
+    list_display = ('title', 'type', 'creation_date', 'rating',)
+
+    list_filter = ('type',)
+
+    search_fields = ('title', 'description', 'id')
+
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
     inlines = (PersonFilmworkInline,)
+
+    list_display = ('full_name', 'created')
+
+    search_fields = ('full_name', 'id',)
