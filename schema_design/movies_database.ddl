@@ -1,6 +1,6 @@
 CREATE SCHEMA IF NOT EXISTS content;
 
-CREATE TABLE IF NOT EXISTS content.film_work (
+CREATE TABLE IF NOT EXISTS content.filmwork (
 	id uuid PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
@@ -26,23 +26,22 @@ CREATE TABLE IF NOT EXISTS content.genre (
 	modified timestamp with time zone
 );
 
-CREATE TABLE IF NOT EXISTS content.genre_film_work (
+CREATE TABLE IF NOT EXISTS content.genre_filmwork (
 	id uuid PRIMARY KEY,
 	genre_id uuid NOT NULL REFERENCES content.genre,
-	film_work_id uuid NOT NULL REFERENCES content.film_work,
+	filmwork_id uuid NOT NULL REFERENCES content.filmwork,
 	created timestamp with time zone
 );
 
-CREATE TABLE IF NOT EXISTS content.person_film_work (
+CREATE TABLE IF NOT EXISTS content.person_filmwork (
 	id uuid PRIMARY KEY,
-	film_work_id uuid NOT NULL REFERENCES content.film_work,
+	filmwork_id uuid NOT NULL REFERENCES content.filmwork,
 	person_id uuid NOT NULL REFERENCES content.person,
 	role TEXT NOT NULL,
 	created timestamp with time zone
 );
 
-CREATE INDEX film_work_creation_date_idx ON content.film_work(creation_date);
-CREATE UNIQUE INDEX some_name_idx ON some_table (some_unique_field);
-CREATE UNIQUE INDEX film_work_person_idx ON content.person_film_work (film_work_id, person_id);
+CREATE INDEX filmwork_creation_date_idx ON content.filmwork(creation_date);
+CREATE UNIQUE INDEX filmwork_person_idx ON content.person_filmwork (filmwork_id, person_id);
 
 
