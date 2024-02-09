@@ -50,25 +50,25 @@ class Filmwork(UUIDMixin):
     genres = models.ManyToManyField(Genre, through='GenreFilmwork')
 
     class Meta:
-        db_table = "content\".\"filmwork"
-        verbose_name = _('filmwork')
-        verbose_name_plural = _('filmworks')
+        db_table = "content\".\"film_work"
+        verbose_name = _('film_work')
+        verbose_name_plural = _('film_works')
 
     def __str__(self):
         return self.title
 
 
 class GenreFilmwork(UUIDMixin):
-    filmwork = models.ForeignKey('Filmwork', on_delete=models.CASCADE,
-                                 verbose_name=_('filmwork'))
+    film_work = models.ForeignKey('Filmwork', on_delete=models.CASCADE,
+                                  verbose_name=_('film_work'))
     genre = models.ForeignKey('Genre', on_delete=models.CASCADE,
                               verbose_name=_('person'))
     created = models.DateTimeField(_('created'), auto_now_add=True)
 
     class Meta:
-        db_table = "content\".\"genre_filmwork"
-        verbose_name = _('genre_filmwork')
-        verbose_name_plural = _('genre_filmwork')
+        db_table = "content\".\"genre_film_work"
+        verbose_name = _('genre_film_work')
+        verbose_name_plural = _('genre_film_works')
 
 
 class Person(UUIDMixin, TimeStampedMixin):
@@ -84,14 +84,14 @@ class Person(UUIDMixin, TimeStampedMixin):
 
 
 class PersonFilmwork(UUIDMixin):
-    filmwork = models.ForeignKey('Filmwork', on_delete=models.CASCADE,
-                                 verbose_name=_('filmwork'))
+    film_work = models.ForeignKey('Filmwork', on_delete=models.CASCADE,
+                                  verbose_name=_('film_work'))
     person = models.ForeignKey('Person', on_delete=models.CASCADE,
                                verbose_name=_('person'))
     role = models.TextField(_('role'))
     created = models.DateTimeField(_('created'), auto_now_add=True)
 
     class Meta:
-        db_table = "content\".\"person_filmwork"
-        verbose_name = _('person_filmwork')
-        verbose_name_plural = _('person_filmwork')
+        db_table = "content\".\"person_film_work"
+        verbose_name = _('person_film_work')
+        verbose_name_plural = _('person_film_works')
