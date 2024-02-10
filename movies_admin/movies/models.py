@@ -5,8 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 
 class TimeStampedMixin(models.Model):
-    created = models.DateTimeField(_('created'), auto_now_add=True)
-    modified = models.DateTimeField(_('modified'), auto_now=True)
+    created_at = models.DateTimeField(_('created_at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated_at'), auto_now=True)
 
     class Meta:
         abstract = True
@@ -20,7 +20,6 @@ class UUIDMixin(models.Model):
 
 
 class Genre(UUIDMixin, TimeStampedMixin):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_('name'), max_length=255)
     description = models.TextField(_('description'), blank=True)
 
@@ -33,20 +32,21 @@ class Genre(UUIDMixin, TimeStampedMixin):
         return self.name
 
 
-class Filmwork(UUIDMixin):
+class Filmwork(UUIDMixin, TimeStampedMixin):
     class Type(models.TextChoices):
         MOVIE = "movie", _('movie')
         TV_SHOW = "tv_show", _('tv_show')
 
     title = models.CharField(_('name'), max_length=255)
     description = models.TextField(_('description'), blank=True)
-    creation_date = models.DateTimeField(_('creation_date'), auto_now_add=True)
+    creation_date = models.DateField(_('creation_date'), blank=True)
+    file_path = models.TextField(_('file_path'), blank=True)
     rating = models.FloatField(_('rating'),
                                default=0.0,
                                validators=[MinValueValidator(0.0),
                                            MaxValueValidator(10)],
                                blank=True)
-    type = models.CharField(_('type'), max_length=255, choices=Type.choices)
+    type = models.CharField(_('type'), max_length=128, choices=Type.choices)
     genres = models.ManyToManyField(Genre, through='GenreFilmwork')
 
     class Meta:
@@ -63,7 +63,7 @@ class GenreFilmwork(UUIDMixin):
                                   verbose_name=_('film_work'))
     genre = models.ForeignKey('Genre', on_delete=models.CASCADE,
                               verbose_name=_('person'))
-    created = models.DateTimeField(_('created'), auto_now_add=True)
+    created_at = models.DateTimeField(_('created_at'), auto_now_add=True)
 
     class Meta:
         db_table = "content\".\"genre_film_work"
@@ -89,7 +89,7 @@ class PersonFilmwork(UUIDMixin):
     person = models.ForeignKey('Person', on_delete=models.CASCADE,
                                verbose_name=_('person'))
     role = models.TextField(_('role'))
-    created = models.DateTimeField(_('created'), auto_now_add=True)
+    created_at = models.DateTimeField(_('created_at'), auto_now_add=True)
 
     class Meta:
         db_table = "content\".\"person_film_work"

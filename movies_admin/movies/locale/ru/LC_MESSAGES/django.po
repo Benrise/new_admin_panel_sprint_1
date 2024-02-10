@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2024-02-09 15:42+0000\n"
+"POT-Creation-Date: 2024-02-10 18:34+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1232,40 +1232,44 @@ msgid "movies"
 msgstr "Фильмы"
 
 #: movies/models.py:8 movies/models.py:66 movies/models.py:92
-msgid "created"
+msgid "created_at"
 msgstr "Создано"
 
 #: movies/models.py:9
-msgid "modified"
-msgstr "Изменено"
+msgid "updated_at"
+msgstr "Обновлено"
 
-#: movies/models.py:24 movies/models.py:41
+#: movies/models.py:23 movies/models.py:40
 msgid "name"
 msgstr "Наименование"
 
-#: movies/models.py:25 movies/models.py:42
+#: movies/models.py:24 movies/models.py:41
 msgid "description"
 msgstr "Описание"
 
-#: movies/models.py:29
+#: movies/models.py:28
 msgid "genre"
 msgstr "Жанр"
 
-#: movies/models.py:30
+#: movies/models.py:29
 msgid "genres"
 msgstr "Жанры"
 
-#: movies/models.py:38
+#: movies/models.py:37
 msgid "movie"
 msgstr "Фильм"
 
-#: movies/models.py:39
+#: movies/models.py:38
 msgid "tv_show"
 msgstr "ТВ Шоу"
 
-#: movies/models.py:43
+#: movies/models.py:42
 msgid "creation_date"
 msgstr "Дата выпуска"
+
+#: movies/models.py:43
+msgid "file_path"
+msgstr "Путь к файлу"
 
 #: movies/models.py:44
 msgid "rating"
