@@ -4,7 +4,14 @@ import sqlite3
 import psycopg2
 from psycopg2.extensions import connection as _connection
 from psycopg2.extras import DictCursor
-from utils.movie_dataclasses import Genre, Filmwork, GenreFilmwork, PersonFilmwork, Person
+from utils.movie_dataclasses import (
+    Genre,
+    Filmwork,
+    GenreFilmwork,
+    PersonFilmwork,
+    Person
+)
+from dataclasses import fields, dataclass
 
 
 class TablesNamesEnum(Enum):
@@ -15,15 +22,13 @@ class TablesNamesEnum(Enum):
     PERSON_FILM_WORK = 'person_film_work'
 
 
+@dataclass
 class DataTable:
     name: str
     data: list
 
-    def __init__(self, name, data):
-        self.name = name
-        self.data = data
 
-
+@dataclass
 class DataTables:
     film_work: DataTable
     genre: DataTable
@@ -31,210 +36,98 @@ class DataTables:
     person: DataTable
     person_film_work: DataTable
 
-    def __init__(self,
-                 film_work,
-                 genre,
-                 genre_film_work,
-                 person,
-                 person_film_work):
-        self.film_work = film_work
-        self.genre = genre
-        self.genre_film_work = genre_film_work
-        self.person = person
-        self.person_film_work = person_film_work
-
 
 class SQLiteExtractor:
-    connection: sqlite3.Connection
-
-    def __init__(self, connection):
+    def __init__(self, connection: sqlite3.Connection):
         self.connection = connection
 
+    def _execute_query(self, query):
+        curs = self.connection.cursor()
+        curs.execute(query)
+        return curs.fetchall()
+
+    def _get_tables(self):
+        query = "SELECT * FROM sqlite_master WHERE type='table';"
+        return self._execute_query(query)
+
+    def _create_records(self, rows, record_class):
+        records = []
+        for row in rows:
+            record = record_class(*row)
+            records.append(record)
+        return records
+
     def extract_movies(self):
-        db_path = 'db.sqlite'
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        curs = conn.cursor()
-        curs.execute("SELECT * FROM sqlite_master where type='table';")
-        tables = curs.fetchall()
+        film_work_data = []
+        genre_data = []
+        genre_film_work_data = []
+        person_data = []
+        person_film_work_data = []
+
+        tables = self._get_tables()
         for table in tables:
-            if (table[1] == 'film_work'):
-                film_work_data = []
-                for row in curs.execute(f"SELECT * FROM {table[1]}"):
-                    record = Filmwork(row['id'],
-                                      row['title'],
-                                      row['description'],
-                                      row['creation_date'],
-                                      row['file_path'],
-                                      row['rating'],
-                                      row['type'],
-                                      row['created_at'],
-                                      row['updated_at'])
-                    film_work_data.append(record)
+            table_name = table[1]
+            query = f"SELECT * FROM {table_name}"
+            rows = self._execute_query(query)
 
-            if (table[1] == 'genre'):
-                genre_data = []
-                for row in curs.execute(f"SELECT * FROM {table[1]}"):
-                    record = Genre(row['id'],
-                                   row['name'],
-                                   row['description'],
-                                   row['created_at'],
-                                   row['updated_at'])
-                    genre_data.append(record)
+            if (table_name == TablesNamesEnum.FILM_WORK.value):
+                film_work_data = self._create_records(rows, Filmwork)
 
-            if (table[1] == 'genre_film_work'):
-                genre_film_work_data = []
-                for row in curs.execute(f"SELECT * FROM {table[1]}"):
-                    record = GenreFilmwork(row['id'],
-                                           row['film_work_id'],
-                                           row['genre_id'],
-                                           row['created_at'])
-                    genre_film_work_data.append(record)
+            elif (table_name == TablesNamesEnum.GENRE.value):
+                genre_data = self._create_records(rows, Genre)
 
-            if (table[1] == 'person'):
-                person_data = []
-                for row in curs.execute(f"SELECT * FROM {table[1]}"):
-                    record = Person(row['id'],
-                                    row['full_name'],
-                                    row['created_at'],
-                                    row['updated_at'])
-                    person_data.append(record)
+            elif (table_name == TablesNamesEnum.GENRE_FILM_WORK.value):
+                genre_film_work_data = self._create_records(rows, GenreFilmwork)
 
-            if (table[1] == 'person_film_work'):
-                person_film_work_data = []
-                for row in curs.execute(f"SELECT * FROM {table[1]}"):
-                    record = PersonFilmwork(row['id'],
-                                            row['film_work_id'],
-                                            row['person_id'],
-                                            row['role'],
-                                            row['created_at'])
-                    person_film_work_data.append(record)
-        conn.close()
-        data_tables = DataTables(film_work=DataTable(TablesNamesEnum.FILM_WORK.name, film_work_data),
-                                 genre=DataTable(TablesNamesEnum.GENRE.name, genre_data),
-                                 genre_film_work=DataTable(TablesNamesEnum.GENRE_FILM_WORK.name, genre_film_work_data),
-                                 person=DataTable(TablesNamesEnum.PERSON.name, person_data),
-                                 person_film_work=DataTable(TablesNamesEnum.PERSON_FILM_WORK.name, person_film_work_data)
-                                 )
+            elif (table_name == TablesNamesEnum.PERSON.value):
+                person_data = self._create_records(rows, Person)
+
+            elif (table_name == TablesNamesEnum.PERSON_FILM_WORK.value):
+                person_film_work_data = self._create_records(rows, PersonFilmwork)
+
+        data_tables = DataTables(
+            DataTable(TablesNamesEnum.FILM_WORK.name, film_work_data),
+            DataTable(TablesNamesEnum.GENRE.name, genre_data),
+            DataTable(TablesNamesEnum.GENRE_FILM_WORK.name, genre_film_work_data),
+            DataTable(TablesNamesEnum.PERSON.name, person_data),
+            DataTable(TablesNamesEnum.PERSON_FILM_WORK.name, person_film_work_data))
+
         return data_tables
 
 
 class PostgresSaver:
-    connection: _connection
-
-    def __init__(self, connection):
+    def __init__(self, connection: _connection):
         self.connection = connection
 
     def save_all_data(self, data_tables: DataTables):
         curs = self.connection.cursor()
-        args = []
-        for item in data_tables.genre.data:
-            args.append(curs.mogrify("(%s, %s, %s, %s, %s)",
-                                     (item.id,
-                                      item.name,
-                                      item.description,
-                                      item.created_at,
-                                      item.updated_at)
-                                     ).decode())
-
-        args_str = ','.join(args)
-        curs.execute(f"""
-            INSERT INTO content.{data_tables.genre.name} (id,
-            name,
-            description,
-            created_at,
-            updated_at)
-            VALUES {args_str}
-            ON CONFLICT (id) DO NOTHING
-            """)
-
-        args = []
-        for item in data_tables.film_work.data:
-            args.append(curs.mogrify("(%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                                     (item.id,
-                                      item.title,
-                                      item.description,
-                                      item.creation_date,
-                                      item.file_path,
-                                      item.type,
-                                      item.rating,
-                                      item.created_at,
-                                      item.updated_at)).decode())
-
-        args_str = ','.join(args)
-        curs.execute(f"""
-            INSERT INTO content.{data_tables.film_work.name} (id,
-            title,
-            description,
-            creation_date,
-            file_path,
-            type,
-            rating,
-            created_at,
-            updated_at)
-            VALUES {args_str}
-            ON CONFLICT (id) DO NOTHING
-            """)
-
-        args = []
-        for item in data_tables.genre_film_work.data:
-            args.append(curs.mogrify("(%s, %s, %s, %s)",
-                                     (item.id,
-                                      item.film_work_id,
-                                      item.genre_id,
-                                      item.created_at)).decode())
-
-        args_str = ','.join(args)
-        curs.execute(f"""
-            INSERT INTO content.{data_tables.genre_film_work.name} (id,
-            film_work_id,
-            genre_id,
-            created_at)
-            VALUES {args_str}
-            ON CONFLICT (id) DO NOTHING
-            """)
-
-        args = []
-        for item in data_tables.person.data:
-            args.append(curs.mogrify("(%s, %s, %s, %s)",
-                                     (item.id, 
-                                      item.full_name,
-                                      item.created_at,
-                                      item.updated_at)).decode())
-        args_str = ','.join(args)
-        curs.execute(f"""
-            INSERT INTO content.{data_tables.person.name} (id,
-            full_name,
-            created_at,
-            updated_at)
-            VALUES {args_str}
-            ON CONFLICT (id) DO NOTHING
-            """)
-
-        args = []
-        for item in data_tables.person_film_work.data:
-            args.append(curs.mogrify("(%s, %s, %s, %s, %s)",
-                                     (item.id,
-                                      item.film_work_id,
-                                      item.person_id,
-                                      item.role,
-                                      item.created_at)).decode())
-        args_str = ','.join(args)
-        curs.execute(f"""
-            INSERT INTO content.{data_tables.person_film_work.name} (id,
-            film_work_id,
-            person_id,
-            role,
-            created_at)
-            VALUES {args_str}
-            ON CONFLICT (id) DO NOTHING
-            """)
-
+        insert_table_records(data_tables.genre, curs)
+        insert_table_records(data_tables.film_work, curs)
+        insert_table_records(data_tables.genre_film_work, curs)
+        insert_table_records(data_tables.person, curs)
+        insert_table_records(data_tables.person_film_work, curs)
         curs.close()
 
 
+def insert_table_records(data_table: DataTable, curs: DictCursor):
+    args = []
+    attribute_names = []
+    for item in data_table.data:
+        item_fields = fields(item)
+        attribute_names = [field.name for field in item_fields]
+        values = [getattr(item, field) for field in attribute_names]
+        args.append(curs.mogrify(f"({', '.join(['%s']*len(attribute_names))})", tuple(values)).decode())
+    args_str = ','.join(args)
+    attribute_names_str = ', '.join(attribute_names)
+
+    curs.execute(f"""
+        INSERT INTO content.{data_table.name} ({attribute_names_str})
+        VALUES {args_str}
+        ON CONFLICT (id) DO NOTHING
+    """)
+
+
 def load_from_sqlite(connection: sqlite3.Connection, pg_conn: _connection):
-    """Основной метод загрузки данных из SQLite в Postgres"""
     postgres_saver = PostgresSaver(pg_conn)
     sqlite_extractor = SQLiteExtractor(connection)
 
