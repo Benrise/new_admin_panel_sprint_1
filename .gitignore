@@ -104,7 +104,8 @@ env/
 venv/ 
 ENV/ 
 env.bak/ 
-venv.bak/ 
+venv.bak/
+*/.env
 
 # mkdocs documentation 
 /site 
@@ -139,6 +140,4 @@ GitHub.sublime-settings
 .history
 
 # Mac OS Desktop Services Store
-.DS_Store
-schema_design/.DS_Store
-.DS_Store
+*.DS_Store
