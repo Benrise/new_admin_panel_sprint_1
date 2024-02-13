@@ -1,33 +1,43 @@
-from enum import Enum
+import logging
 import sqlite3
 import subprocess
+from contextlib import contextmanager
+from dataclasses import dataclass, fields
 
 import psycopg2
-from psycopg2.extensions import connection as _connection
+from config import DSL
 from psycopg2 import DatabaseError
+from psycopg2.extensions import connection as _connection
 from psycopg2.extras import DictCursor
 from utils.movie_dataclasses import (
-    Genre,
     Filmwork,
+    Genre,
     GenreFilmwork,
+    Person,
     PersonFilmwork,
-    Person
 )
-from dataclasses import fields, dataclass
+
+table_name_model_mapping = {
+    "film_work": Filmwork,
+    "genre": Genre,
+    "genre_film_work": GenreFilmwork,
+    "person": Person,
+    "person_film_work": PersonFilmwork,
+}
 
 
-class TablesNamesEnum(Enum):
-    FILM_WORK = 'film_work'
-    GENRE = 'genre'
-    GENRE_FILM_WORK = 'genre_film_work'
-    PERSON = 'person'
-    PERSON_FILM_WORK = 'person_film_work'
+@contextmanager
+def closing(conn):
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 @dataclass
 class DataTable:
-    name: str
-    data: list
+    name: str = None
+    data: list = None
 
 
 @dataclass
@@ -44,12 +54,20 @@ class SQLiteExtractor:
         self.connection = connection
 
     def _execute_query(self, query):
+        records = []
         try:
             curs = self.connection.cursor()
             curs.execute(query)
-            return curs.fetchall()
+            while True:
+                rows = curs.fetchmany(20)
+                if rows:
+                    for row in rows:
+                        records.append(row)
+                else:
+                    break
+            return records
         except sqlite3.Error as e:
-            print(f"SQLite error while executing the query: {e}")
+            logging.error(f"SQLite error while executing the query: {e}")
             raise
 
     def _get_tables(self):
@@ -63,52 +81,32 @@ class SQLiteExtractor:
                 record = record_class(*row)
                 records.append(record)
             except Exception as e:
-                print(f"Error on creating a record: {e}")
+                logging.error(f"Error on creating a record: {e}")
                 raise
         return records
 
     def extract_movies(self):
+        data_tables = DataTables(
+            DataTable(),
+            DataTable(),
+            DataTable(),
+            DataTable(),
+            DataTable(),
+        )
         try:
-            film_work_data = []
-            genre_data = []
-            genre_film_work_data = []
-            person_data = []
-            person_film_work_data = []
-
             tables = self._get_tables()
             for table in tables:
                 table_name = table[1]
                 query = f"SELECT * FROM {table_name}"
                 rows = self._execute_query(query)
-
-                if table_name == TablesNamesEnum.FILM_WORK.value:
-                    film_work_data = self._create_records(rows, Filmwork)
-
-                elif table_name == TablesNamesEnum.GENRE.value:
-                    genre_data = self._create_records(rows, Genre)
-
-                elif table_name == TablesNamesEnum.GENRE_FILM_WORK.value:
-                    genre_film_work_data = self._create_records(rows, GenreFilmwork)
-
-                elif table_name == TablesNamesEnum.PERSON.value:
-                    person_data = self._create_records(rows, Person)
-
-                elif table_name == TablesNamesEnum.PERSON_FILM_WORK.value:
-                    person_film_work_data = self._create_records(rows, PersonFilmwork)
-
-            data_tables = DataTables(
-                DataTable(TablesNamesEnum.FILM_WORK.name, film_work_data),
-                DataTable(TablesNamesEnum.GENRE.name, genre_data),
-                DataTable(TablesNamesEnum.GENRE_FILM_WORK.name, genre_film_work_data),
-                DataTable(TablesNamesEnum.PERSON.name, person_data),
-                DataTable(TablesNamesEnum.PERSON_FILM_WORK.name, person_film_work_data))
-
+                data_class_model = table_name_model_mapping[table_name]
+                data_class_data = self._create_records(rows, data_class_model)
+                setattr(data_tables, table_name, DataTable(table_name, data_class_data))
             return data_tables
 
         except Exception as e:
-            print(f"Unexpected error: {e}")
+            logging.error(f"Unexpected error: {e}")
             raise
-
 
 
 class PostgresSaver:
@@ -117,12 +115,9 @@ class PostgresSaver:
 
     def save_all_data(self, data_tables: DataTables):
         curs = self.connection.cursor()
-        insert_table_records(data_tables.genre, curs)
-        insert_table_records(data_tables.film_work, curs)
-        insert_table_records(data_tables.genre_film_work, curs)
-        insert_table_records(data_tables.person, curs)
-        insert_table_records(data_tables.person_film_work, curs)
-        curs.close()
+        for _, data_table in data_tables.__dict__.items():
+            if isinstance(data_table, DataTable) and data_table.data:
+                insert_table_records(data_table, curs)
 
 
 def insert_table_records(data_table: DataTable, curs: DictCursor):
@@ -133,24 +128,30 @@ def insert_table_records(data_table: DataTable, curs: DictCursor):
             item_fields = fields(item)
             attribute_names = [field.name for field in item_fields]
             values = [getattr(item, field) for field in attribute_names]
-            args.append(curs.mogrify(f"({', '.join(['%s']*len(attribute_names))})", tuple(values)).decode())
-        args_str = ','.join(args)
-        attribute_names_str = ', '.join(attribute_names)
+            args.append(
+                curs.mogrify(
+                    f"({', '.join(['%s']*len(attribute_names))})", tuple(values)
+                ).decode()
+            )
+        args_str = ",".join(args)
+        attribute_names_str = ", ".join(attribute_names)
 
-        curs.execute(f"""
+        curs.execute(
+            f"""
             INSERT INTO content.{data_table.name} ({attribute_names_str})
             VALUES {args_str}
             ON CONFLICT (id) DO NOTHING
-        """)
+        """
+        )
 
         curs.connection.commit()
 
     except DatabaseError as e:
-        print(f"Database error while insert data: {e}")
+        logging.error(f"Database error while insert data: {e}")
         curs.connection.rollback()
 
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        logging.error(f"Unexpected error: {e}")
         raise
 
 
@@ -162,16 +163,17 @@ def load_from_sqlite(connection: sqlite3.Connection, pg_conn: _connection):
     postgres_saver.save_all_data(data)
 
 
-if __name__ == '__main__':
-    dsl = {'dbname': 'movies_database', 'user': 'app', 'password': '123qwe', 'host': '127.0.0.1', 'port': 5433}
-    with sqlite3.connect('db.sqlite') as sqlite_conn, psycopg2.connect(**dsl, cursor_factory=DictCursor) as pg_conn:
-        print('Data transfer has started...')
+if __name__ == "__main__":
+    with sqlite3.connect("db.sqlite") as sqlite_conn, closing(
+        psycopg2.connect(**DSL, cursor_factory=DictCursor)
+    ) as pg_conn:
+        print("Data transfer has started...")
         load_from_sqlite(sqlite_conn, pg_conn)
-        print('Data transfer is completed!')
+        print("Data transfer is completed!")
     run_tests = input("Start tests? (y/n): ").lower()
-    if run_tests == 'y':
+    if run_tests == "y":
         try:
             print("Running tests...")
-            subprocess.run(['python', 'tests/check_consistency/main.py'])
+            subprocess.run(["python", "tests/check_consistency/main.py"])
         except Exception as e:
-            print(f"Error on running tests: {e}")
+            logging.error(f"Error on running tests: {e}")
